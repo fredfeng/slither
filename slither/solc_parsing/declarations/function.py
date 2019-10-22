@@ -289,6 +289,63 @@ class FunctionSolc(Function):
             link_nodes(condition_node, endIf_node)
         return endIf_node
 
+    def count_stmts(self, statement):
+        hopeless = 100
+        chance = 5
+
+        nodeType = statement['nodeType']
+        # print('debugstatement(*******): ', nodeType, statement)
+
+        if nodeType == 'IfStatement':
+            counter = 5
+            if statement['falseBody']:
+                counter = counter + self.count_stmts(statement['falseBody'])
+            if statement['trueBody']:
+                counter = counter + self.count_stmts(statement['trueBody'])
+            return counter
+        elif nodeType == 'WhileStatement':
+            return hopeless
+        elif nodeType == 'ForStatement':
+            return hopeless
+        elif nodeType == 'Block':
+            return 1
+        elif nodeType == 'InlineAssembly':
+            return hopeless
+        elif nodeType == 'DoWhileStatement':
+            return hopeless
+        elif nodeType == 'Continue':
+            return 1
+        elif nodeType == 'Break':
+            return 1
+        elif nodeType == 'Return':
+            return 1
+        elif nodeType == 'Throw':
+            return 1
+        elif nodeType == 'EmitStatement':
+            return 1
+        elif nodeType in ['VariableDefinitionStatement', 'VariableDeclarationStatement']:
+            return 1
+        elif nodeType == 'ExpressionStatement':
+            expr = statement['expression']
+            if 'kind' in expr:
+                # print('*********************', expr['expression']['expression'])
+                func_name = ''
+                if 'name' in expr['expression']:
+                    func_name = expr['expression']['name']
+                elif 'expression' in expr['expression'] and 'name' in expr['expression']['expression']:
+                    func_name = expr['expression']['expression']['name']
+                else:
+                    func_name = 'unknown'
+
+                if expr['kind'] == 'functionCall' and (func_name in ['add', 'sub', 'mul', 'div']):
+                    return 1
+                else:
+                    return chance;
+            else:
+                return 1
+        else:
+            return counter
+
     def _parse_while(self, whileStatement, node):
         # WhileStatement = 'while' '(' Expression ')' Statement
 
@@ -298,6 +355,13 @@ class FunctionSolc(Function):
             node_condition = self._new_node(NodeType.IFLOOP, whileStatement['condition']['src'])
             node_condition.add_unparsed_expression(whileStatement['condition'])
             statement = self._parse_statement(whileStatement['body'], node_condition)
+            # print('yufeng hack while....', whileStatement['body'])
+            stmt_number = 0
+            for stmt in whileStatement['body']['statements']:
+                stmt_number = stmt_number + self.count_stmts(stmt)
+                # print('nodeType:', stmt['nodeType'], stmt['expression'], ('kind' in stmt['expression']))
+            
+            print('find out a while-loop---: ', stmt_number)
         else:
             children = whileStatement[self.get_children('children')]
             expression = children[0]
@@ -319,6 +383,11 @@ class FunctionSolc(Function):
         init_expression = statement['initializationExpression']
         condition = statement['condition']
         loop_expression = statement['loopExpression']
+        stmt_number = 0
+        for stmt in body['statements']:
+            stmt_number = stmt_number + self.count_stmts(stmt)
+        
+        print('find out a for-loop---: ', stmt_number)
 
         node_startLoop = self._new_node(NodeType.STARTLOOP, statement['src'])
         node_endLoop = self._new_node(NodeType.ENDLOOP, statement['src'])
